@@ -4,7 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Net;
+using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Azure.Messaging.EventHubs.Authorization;
@@ -20,8 +21,8 @@ namespace Azure.Messaging.EventHubs.Tests
     /// </summary>
     ///
     /// <remarks>
-    ///   These tests have a depenency on live Azure services and may
-    ///   incur costs for the assocaied Azure subscription.
+    ///   These tests have a dependency on live Azure services and may
+    ///   incur costs for the associated Azure subscription.
     /// </remarks>
     ///
     [TestFixture]
@@ -143,7 +144,7 @@ namespace Azure.Messaging.EventHubs.Tests
                     Assert.That(properties, Is.Not.Null, "A set of properties should have been returned.");
                     Assert.That(properties.Path, Is.EqualTo(scope.EventHubName), "The property Event Hub name should match the scope.");
                     Assert.That(properties.PartitionIds.Length, Is.EqualTo(partitionCount), "The properties should have the requested number of partitions.");
-                    Assert.That(properties.CreatedAtUtc, Is.EqualTo(DateTime.UtcNow).Within(TimeSpan.FromSeconds(5)), "The Event Hub should have been created just about now.");
+                    Assert.That(properties.CreatedAt, Is.EqualTo(DateTimeOffset.UtcNow).Within(TimeSpan.FromSeconds(10)), "The Event Hub should have been created just about now.");
                 }
             }
         }
@@ -188,8 +189,8 @@ namespace Azure.Messaging.EventHubs.Tests
                     Assert.That(partitionProperties.Id, Is.EqualTo(partition), "The partition identifier should match.");
                     Assert.That(partitionProperties.EventHubPath, Is.EqualTo(connectionProperties.EventHubPath).Using((IEqualityComparer<string>)StringComparer.InvariantCultureIgnoreCase), "The Event Hub path should match.");
                     Assert.That(partitionProperties.BeginningSequenceNumber, Is.Not.EqualTo(default(Int64)), "The beginning sequence number should have been populated.");
-                    Assert.That(partitionProperties.LastEnqueuedSequenceNumber, Is.Not.EqualTo(default(Int64)), "The last sequance number should have been populated.");
-                    Assert.That(partitionProperties.LastEnqueuedOffset, Is.Not.Null.Or.Empty, "The last offset should have been populated.");
+                    Assert.That(partitionProperties.LastEnqueuedSequenceNumber, Is.Not.EqualTo(default(Int64)), "The last sequence number should have been populated.");
+                    Assert.That(partitionProperties.LastEnqueuedOffset, Is.Not.EqualTo(default(Int64)), "The last offset should have been populated.");
                 }
             }
         }
@@ -249,7 +250,9 @@ namespace Azure.Messaging.EventHubs.Tests
                         await client.CloseAsync();
                     }
 
-                    Assert.That(async () => await client.GetPartitionIdsAsync(), Throws.TypeOf<OperationCanceledException>());
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+
+                    Assert.That(async () => await client.GetPartitionIdsAsync(), Throws.TypeOf<ObjectDisposedException>());
                     Assert.That(async () => await client.GetPropertiesAsync(), Throws.TypeOf<ObjectDisposedException>());
                     Assert.That(async () => await client.GetPartitionPropertiesAsync(partition), Throws.TypeOf<ObjectDisposedException>());
                 }
@@ -275,6 +278,36 @@ namespace Azure.Messaging.EventHubs.Tests
                 await using (var client = new EventHubClient(connectionString))
                 {
                     Assert.That(async () => await client.GetPartitionPropertiesAsync(invalidPartition), Throws.TypeOf<ArgumentOutOfRangeException>());
+                }
+            }
+        }
+
+        /// <summary>
+        ///   Verifies that the <see cref="EventHubClient" /> is able to
+        ///   connect to the Event Hubs service.
+        /// </summary>
+        ///
+        [Test]
+        public async Task ClientCannotRetrieveMetadataWhenProxyIsInvalid()
+        {
+            await using (var scope = await EventHubScope.CreateAsync(1))
+            {
+                var connectionString = TestEnvironment.BuildConnectionStringForEventHub(scope.EventHubName);
+                var clientOptions = new EventHubClientOptions
+                {
+                    Proxy = new WebProxy("http://1.2.3.4:9999"),
+                    TransportType = TransportType.AmqpWebSockets,
+                    RetryOptions = new RetryOptions { TryTimeout = TimeSpan.FromMinutes(2) }
+                };
+
+                await using (var client = new EventHubClient(connectionString))
+                await using (var invalidProxyClient = new EventHubClient(connectionString, clientOptions))
+                {
+                    var partition = (await client.GetPartitionIdsAsync()).First();
+
+                    Assert.That(async () => await invalidProxyClient.GetPartitionIdsAsync(), Throws.InstanceOf<WebSocketException>().Or.InstanceOf<TimeoutException>());
+                    Assert.That(async () => await invalidProxyClient.GetPropertiesAsync(), Throws.InstanceOf<WebSocketException>().Or.InstanceOf<TimeoutException>());
+                    Assert.That(async () => await invalidProxyClient.GetPartitionPropertiesAsync(partition), Throws.InstanceOf<WebSocketException>().Or.InstanceOf<TimeoutException>());
                 }
             }
         }

@@ -15,7 +15,7 @@ namespace Azure.Messaging.EventHubs.Samples
     ///   An introduction to consuming events, using a simple <see cref="EventHubConsumer" />.
     /// </summary>
     ///
-    public class Sample7_ConsumeEvents : ISample
+    public class Sample7_ConsumeEvents : IEventHubsSample
     {
         /// <summary>
         ///   The name of the sample.
@@ -103,7 +103,7 @@ namespace Azure.Messaging.EventHubs.Samples
                     // time that we've allowed.
                     //
                     // We will ask for just our event, but allow a fairly long wait period to ensure that we're able to receive it.
-                    // If you observe the time that the call takes, it is extremely likely that the request to recieve will complete
+                    // If you observe the time that the call takes, it is extremely likely that the request to receive will complete
                     // long before the maximum wait time.
 
                     Stopwatch watch = Stopwatch.StartNew();

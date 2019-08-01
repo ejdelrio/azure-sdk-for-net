@@ -244,12 +244,12 @@ namespace Azure.Messaging.EventHubs.Samples
         ///
         /// <returns>The set of samples defined in the solution.</returns>
         ///
-        private static IReadOnlyList<ISample> LocateSamples() =>
+        private static IReadOnlyList<IEventHubsSample> LocateSamples() =>
             typeof(Program)
               .Assembly
               .ExportedTypes
-              .Where(type => (type.IsClass && typeof(ISample).IsAssignableFrom(type)))
-              .Select(type => (ISample)Activator.CreateInstance(type))
+              .Where(type => (type.IsClass && typeof(IEventHubsSample).IsAssignableFrom(type)))
+              .Select(type => (IEventHubsSample)Activator.CreateInstance(type))
               .ToList();
 
         /// <summary>
@@ -259,7 +259,7 @@ namespace Azure.Messaging.EventHubs.Samples
         ///
         private class CommandLineArguments
         {
-            /// <summary>The sequence of characters that prefix a command-line argument./summary>
+            /// <summary>The sequence of characters that prefix a command-line argument.</summary>
             public const string ArgumentPrefix = "--";
 
             /// <summary>The connection string to the Azure Event Hubs namespace for samples.</summary>

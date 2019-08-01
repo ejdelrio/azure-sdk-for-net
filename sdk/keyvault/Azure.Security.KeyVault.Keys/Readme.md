@@ -3,7 +3,7 @@ Azure Key Vault is a cloud service that provides secure storage of keys for encr
 
 The Azure Key Vault keys library client supports RSA keys and Elliptic Curve (EC) keys, each with corresponding support in hardware security modules (HSM). It offers operations to create, retrieve, update, delete, purge, backup, restore and list the keys and its versions.
 
-[Source code][keys_client_src] | Package (NuGet) (coming soon) | [API reference documentation] (coming soon) | [Product documentation][keyvault_docs] | [Samples] (coming soon)
+[Source code][key_client_src] | [Package (NuGet)][key_client_nuget_package] | [API reference documentation][API_reference] | [Product documentation][keyvault_docs] | [Samples][key_client_samples]
 
 ## Getting started
 
@@ -55,10 +55,10 @@ $Env:AZURE_TENANT_ID="tenant-ID"
 
 * Grant the above mentioned application authorization to perform key operations on the key vault:
     ```PowerShell
-    az keyvault set-policy --name <your-key-vault-name> --spn $AZURE_CLIENT_ID --key-permissions backup delete get list set
+    az keyvault set-policy --name <your-key-vault-name> --spn $AZURE_CLIENT_ID --key-permissions backup delete get list create
     ```
     > --key-permissions:
-    > Accepted values: backup, delete, get, list, purge, recover, restore, set
+    > Accepted values: backup, create, decrypt, delete, encrypt, get, import, list, purge, recover, restore, sign, unwrapKey, update, verify, wrapKey
 
 * Use the above mentioned Key Vault name to retrieve details of your Vault which also contains your Key Vault URL:
     ```PowerShell
@@ -148,7 +148,7 @@ Key key = client.CreateKey("key-name", KeyType.EllipticCurve);
 // You can specify additional application-specific metadata in the form of tags.
 key.Tags["foo"] = "updated tag";
 
-KeyBase updatedKey = client.UpdateKey(key);
+KeyBase updatedKey = client.UpdateKey(key, key.KeyMaterial.KeyOps);
 
 Console.WriteLine(updatedKey.Name);
 Console.WriteLine(updatedKey.Version);
@@ -249,16 +249,16 @@ Headers:
 
 ## Next steps
 Several Key Vault Keys client library samples are available to you in this GitHub repository. These samples provide example code for additional scenarios commonly encountered while working with Key Vault:
-* [helloWorld.cs](TODO) and [helloWorldAsync.cs](TODO) - for working with Azure Key Vault, including:
+* [HelloWorld.cs][hello_world_sync] and [HelloWorldAsync.cs][hello_world_async] - for working with Azure Key Vault, including:
   * Create a key
   * Get an existing key
   * Update an existing key
   * Delete a key
 
-* [TestExamples.cs](TODO) and [TestExamplesAsync.cs](TODO) - Contains the code snippets working with Key Vault keys, including:
+* [BackupAndRestore.cs][backup_and_restore_sync] and [BackupAndRestoreAsync.cs][backup_and_restore_async] - Contains the code snippets working with Key Vault keys, including:
   * Backup and recover a key
 
-* [GetKeys.cs](TODO) and [GetKeysAsync.cs](TODO) - Example code for working with Key Vault keys, including:
+* [GetKeys.cs][get_secrets_sync] and [GetKeysAsync.cs][get_secrets_async] - Example code for working with Key Vault keys, including:
   * Create keys
   * List all keys in the Key Vault
   * Update keys in the Key Vault
@@ -279,13 +279,22 @@ When you submit a pull request, a CLA-bot will automatically determine whether y
 This project has adopted the [Microsoft Open Source Code of Conduct][code_of_conduct]. For more information see the Code of Conduct FAQ or contact opencode@microsoft.com with any additional questions or comments.
 
 <!-- LINKS -->
+[API_reference]: https://azure.github.io/azure-sdk-for-net/api/KeyVault/Azure.Security.KeyVault.Keys.html
 [azure_cli]: https://docs.microsoft.com/cli/azure
 [azure_identity]: https://github.com/Azure/azure-sdk-for-net/tree/master/sdk/identity/Azure.Identity
 [azure_sub]: https://azure.microsoft.com/free/
+[backup_and_restore_async]:samples/Sample2_BackupAndRestoreAsync.cs
+[backup_and_restore_sync]:samples/Sample2_BackupAndRestore.cs
 [certificates_client_library]: https://github.com/Azure/azure-sdk-for-net/tree/master/sdk/keyvault/Azure.Security.KeyVault.Certificates
 [code_of_conduct]: https://opensource.microsoft.com/codeofconduct/
+[get_secrets_async]: samples/Sample3_GetKeysAsync.cs
+[get_secrets_sync]: samples/Sample3_GetKeys.cs
+[hello_world_async]: samples/Sample1_HelloWorldAsync.cs
+[hello_world_sync]: samples/Sample1_HelloWorld.cs
 [key_client_class]: src/KeyClient.cs
-[keys_client_src]: https://github.com/Azure/azure-sdk-for-net/tree/master/sdk/keyvault/Azure.Security.KeyVault.Keys/src
+[key_client_nuget_package]: https://www.nuget.org/packages/Azure.Security.KeyVault.Keys/
+[key_client_samples]: https://github.com/Azure/azure-sdk-for-net/tree/master/sdk/keyvault/Azure.Security.KeyVault.Keys/samples
+[key_client_src]: https://github.com/Azure/azure-sdk-for-net/tree/master/sdk/keyvault/Azure.Security.KeyVault.Keys/src
 [keyvault_docs]: https://docs.microsoft.com/en-us/azure/key-vault/
 [keyvault_rest]: https://docs.microsoft.com/en-us/rest/api/keyvault/
 [JWK]: https://tools.ietf.org/html/rfc7517
