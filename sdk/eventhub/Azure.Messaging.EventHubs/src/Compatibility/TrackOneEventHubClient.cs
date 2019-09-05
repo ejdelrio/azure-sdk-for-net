@@ -30,6 +30,23 @@ namespace Azure.Messaging.EventHubs.Compatibility
         private Lazy<TrackOne.EventHubClient> _trackOneClient;
 
         /// <summary>
+        ///   The name of the Event Hub that the consumer is connected to, specific to the
+        ///   Event Hubs namespace that contains it.
+        /// </summary>
+        ///
+        public string EventHubName { get; }
+
+        /// <summary>
+        ///   Indicates whether or not this client has been closed.
+        /// </summary>
+        ///
+        /// <value>
+        ///   <c>true</c> if the client is closed; otherwise, <c>false</c>.
+        /// </value>
+        ///
+        public override bool Closed => (_trackOneClient.IsValueCreated) ? _trackOneClient.Value.CloseCalled : false;
+
+        /// <summary>
         ///   The track one <see cref="TrackOne.EventHubClient" /> for use with this transport client.
         /// </summary>
         ///
@@ -41,7 +58,7 @@ namespace Azure.Messaging.EventHubs.Compatibility
         ///
         /// <param name="host">The fully qualified host name for the Event Hubs namespace.  This is likely to be similar to <c>{yournamespace}.servicebus.windows.net</c>.</param>
         /// <param name="eventHubName">The name of the specific Event Hub to connect the client to.</param>
-        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requeseted Event Hub, depending on Azure configuration.</param>
+        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requested Event Hub, depending on Azure configuration.</param>
         /// <param name="clientOptions">A set of options to apply when configuring the client.</param>
         /// <param name="defaultRetryPolicy">The default retry policy to use if no retry options were specified in the <paramref name="clientOptions" />.</param>
         ///
@@ -68,7 +85,7 @@ namespace Azure.Messaging.EventHubs.Compatibility
         ///
         /// <param name="host">The fully qualified host name for the Event Hubs namespace.  This is likely to be similar to <c>{yournamespace}.servicebus.windows.net</c>.</param>
         /// <param name="eventHubName">The name of the specific Event Hub to connect the client to.</param>
-        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requeseted Event Hub, depending on Azure configuration.</param>
+        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requested Event Hub, depending on Azure configuration.</param>
         /// <param name="clientOptions">A set of options to apply when configuring the client.</param>
         /// <param name="defaultRetryPolicy">The default retry policy to use if no retry options were specified in the <paramref name="clientOptions" />.</param>
         /// <param name="eventHubClientFactory">A delegate that can be used for creation of the <see cref="TrackOne.EventHubClient" /> to which operations are delegated to.</param>
@@ -95,8 +112,10 @@ namespace Azure.Messaging.EventHubs.Compatibility
             Guard.ArgumentNotNull(nameof(clientOptions), clientOptions);
             Guard.ArgumentNotNull(nameof(defaultRetryPolicy), defaultRetryPolicy);
 
+            EventHubName = eventHubName;
+
             _retryPolicy = defaultRetryPolicy;
-            _trackOneClient = new Lazy<TrackOne.EventHubClient>(() => eventHubClientFactory(host, eventHubName, credential, clientOptions, () => _retryPolicy), LazyThreadSafetyMode.PublicationOnly);
+            _trackOneClient = new Lazy<TrackOne.EventHubClient>(() => eventHubClientFactory(host, eventHubName, credential, clientOptions, () => _retryPolicy), LazyThreadSafetyMode.ExecutionAndPublication);
         }
 
         /// <summary>
@@ -106,7 +125,7 @@ namespace Azure.Messaging.EventHubs.Compatibility
         ///
         /// <param name="host">The fully qualified host name for the Event Hubs namespace.  This is likely to be similar to <c>{yournamespace}.servicebus.windows.net</c>.</param>
         /// <param name="eventHubName">The name of the specific Event Hub to connect the client to.</param>
-        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requeseted Event Hub, depending on Azure configuration.</param>
+        /// <param name="credential">The Azure managed identity credential to use for authorization.  Access controls may be specified by the Event Hubs namespace or the requested Event Hub, depending on Azure configuration.</param>
         /// <param name="clientOptions">A set of options to apply when configuring the client.</param>
         /// <param name="defaultRetryPolicyFactory">A function that retrieves a default retry policy to use if no retry options were specified in the <paramref name="clientOptions" />.</param>
         ///
@@ -294,6 +313,7 @@ namespace Azure.Messaging.EventHubs.Compatibility
             return new EventHubProducer
             (
                 new TrackOneEventHubProducer(CreateSenderFactory, initialRetryPolicy),
+                TrackOneClient.ConnectionStringBuilder.Endpoint,
                 TrackOneClient.EventHubName,
                 producerOptions,
                 initialRetryPolicy
@@ -342,7 +362,8 @@ namespace Azure.Messaging.EventHubs.Compatibility
 
                 var trackOneOptions = new TrackOne.ReceiverOptions
                 {
-                    Identifier = consumerOptions.Identifier
+                    Identifier = consumerOptions.Identifier,
+                    EnableReceiverRuntimeMetric = consumerOptions.TrackLastEnqueuedEventInformation
                 };
 
                 PartitionReceiver consumer;
@@ -365,9 +386,13 @@ namespace Azure.Messaging.EventHubs.Compatibility
                 ? new BasicRetryPolicy(consumerOptions.RetryOptions)
                 : defaultRetryPolicy;
 
+            var partitionMetrics = (consumerOptions.TrackLastEnqueuedEventInformation)
+                ? new LastEnqueuedEventProperties(EventHubName, partitionId)
+                : null;
+
             return new EventHubConsumer
             (
-                new TrackOneEventHubConsumer(CreateReceiverFactory, initialRetryPolicy),
+                new TrackOneEventHubConsumer(CreateReceiverFactory, initialRetryPolicy, partitionMetrics),
                 TrackOneClient.EventHubName,
                 partitionId,
                 consumerGroup,

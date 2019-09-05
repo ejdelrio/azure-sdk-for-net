@@ -7,16 +7,12 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using Azure.Core;
 using Azure.Core.Pipeline;
 using Azure.Core.Testing;
-using Azure.Identity;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
-using Azure.Storage.Common;
 using Azure.Storage.Sas;
-using NUnit.Framework;
 
 namespace Azure.Storage.Test.Shared
 {
@@ -254,6 +250,23 @@ namespace Azure.Storage.Test.Shared
             return Convert.ToBase64String(bytes);
         }
 
+        public CustomerProvidedKey GetCustomerProvidedKey()
+        {
+            var bytes = new byte[32];
+            this.Recording.Random.NextBytes(bytes);
+            return new CustomerProvidedKey(bytes);
+        }
+
+        public Uri GetHttpsUri(Uri uri)
+        {
+            var uriBuilder = new UriBuilder(uri)
+            {
+                Scheme = Constants.Https,
+                Port = Constants.HttpPort
+            };
+            return uriBuilder.Uri;
+        }
+
         //TODO consider removing this.
         public async Task<string> SetupBlobMatchCondition(BlobBaseClient blob, string match)
         {
@@ -274,7 +287,7 @@ namespace Azure.Storage.Test.Shared
             Lease lease = null;
             if (leaseId == this.ReceivedLeaseId || leaseId == garbageLeaseId)
             {
-                lease = await this.InstrumentClient(blob.GetLeaseClient(this.Recording.Random.NewGuid().ToString())).AcquireAsync(-1);
+                lease = await this.InstrumentClient(blob.GetLeaseClient(this.Recording.Random.NewGuid().ToString())).AcquireAsync(LeaseClient.InfiniteLeaseDuration);
             }
             return leaseId == this.ReceivedLeaseId ? lease.LeaseId : leaseId;
         }
@@ -285,7 +298,7 @@ namespace Azure.Storage.Test.Shared
             Lease lease = null;
             if (leaseId == this.ReceivedLeaseId || leaseId == garbageLeaseId)
             {
-                lease = await container.GetLeaseClient(this.Recording.Random.NewGuid().ToString()).AcquireAsync(-1);
+                lease = await container.GetLeaseClient(this.Recording.Random.NewGuid().ToString()).AcquireAsync(LeaseClient.InfiniteLeaseDuration);
             }
             return leaseId == this.ReceivedLeaseId ? lease.LeaseId : leaseId;
         }

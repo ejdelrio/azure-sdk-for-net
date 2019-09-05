@@ -6,11 +6,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Azure.Messaging.EventHubs.Core;
 using Azure.Messaging.EventHubs.Errors;
+using Azure.Messaging.EventHubs.Metadata;
 
 namespace Azure.Messaging.EventHubs
 {
@@ -104,6 +106,24 @@ namespace Azure.Messaging.EventHubs
         public string Identifier => Options?.Identifier;
 
         /// <summary>
+        ///   A set of information about the enqueued state of a partition, as observed by the consumer as
+        ///   events are received from the Event Hubs service.
+        /// </summary>
+        ///
+        /// <value><c>null</c>, if the information was not requested; otherwise, the last observed set of partition metrics.</value>
+        ///
+        /// <remarks>
+        ///   When metrics are requested, each event received from the Event Hubs service will carry metadata
+        ///   about the state of a partition that it otherwise would not.  This results in a small amount of
+        ///   additional network bandwidth consumption that is generally a favorable trade-off when considered
+        ///   against periodically making requests for partition properties using the Event Hub client.
+        /// </remarks>
+        ///
+        /// <seealso cref="EventHubConsumerOptions.TrackLastEnqueuedEventInformation" />
+        ///
+        public LastEnqueuedEventProperties LastEnqueuedEventInformation => InnerConsumer.LastEnqueuedEventInformation;
+
+        /// <summary>
         ///   The policy to use for determining retry behavior for when an operation fails.
         /// </summary>
         ///
@@ -159,12 +179,12 @@ namespace Azure.Messaging.EventHubs
         /// </remarks>
         ///
         internal EventHubConsumer(TransportEventHubConsumer transportConsumer,
-                                   string eventHubName,
-                                   string consumerGroup,
-                                   string partitionId,
-                                   EventPosition eventPosition,
-                                   EventHubConsumerOptions consumerOptions,
-                                   EventHubRetryPolicy retryPolicy)
+                                  string eventHubName,
+                                  string consumerGroup,
+                                  string partitionId,
+                                  EventPosition eventPosition,
+                                  EventHubConsumerOptions consumerOptions,
+                                  EventHubRetryPolicy retryPolicy)
         {
             Guard.ArgumentNotNull(nameof(transportConsumer), transportConsumer);
             Guard.ArgumentNotNullOrEmpty(nameof(eventHubName), eventHubName);
@@ -265,30 +285,24 @@ namespace Azure.Messaging.EventHubs
         ///
         /// <seealso cref="SubscribeToEvents(CancellationToken)"/>
         ///
-        public virtual IAsyncEnumerable<EventData> SubscribeToEvents(TimeSpan? maximumWaitTime,
-                                                                     CancellationToken cancellationToken = default)
+        public virtual async IAsyncEnumerable<EventData> SubscribeToEvents(TimeSpan? maximumWaitTime,
+                                                                          [EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
-            if (cancellationToken.IsCancellationRequested)
-            {
-                return CreateEmptyAsyncEnumerable<EventData>();
-            }
+            cancellationToken.ThrowIfCancellationRequested<TaskCanceledException>();
+
+            var maximumQueuedEvents = Math.Min((Options.PrefetchCount / 4), (BackgroundPublishReceiveBatchSize * 2));
+            var subscription = SubscribeToChannel(EventHubName, PartitionId, ConsumerGroup, maximumQueuedEvents, cancellationToken);
 
             try
             {
-                var maximumQueuedEvents = Math.Min((Options.PrefetchCount / 4), (BackgroundPublishReceiveBatchSize * 2));
-                var subscription = SubscribeToChannel(EventHubName, PartitionId, ConsumerGroup, maximumQueuedEvents, cancellationToken);
-
-                return new ChannelEnumerableSubscription<EventData>(subscription.ChannelReader, maximumWaitTime, () => UnsubscribeFromChannelAsync(subscription.Identifier), cancellationToken);
+                await foreach (var item in subscription.ChannelReader.EnumerateChannel(maximumWaitTime, cancellationToken).ConfigureAwait(false))
+                {
+                    yield return item;
+                }
             }
-            catch (Exception ex) when
-                (ex is TaskCanceledException
-                || ex is OperationCanceledException)
+            finally
             {
-
-                // This is unlikely, but possible if cancellation is triggered after the conditional, and
-                // indicates that the synchronization primitive for subscriptions referenced the canceled token.
-
-                return CreateEmptyAsyncEnumerable<EventData>();
+                await UnsubscribeFromChannelAsync(subscription.Identifier).ConfigureAwait(false);
             }
         }
 

@@ -112,6 +112,22 @@ namespace Azure.Messaging.EventHubs
         }
 
         /// <summary>
+        ///   Indicates whether or not the consumer requests metrics for the state of its
+        ///   partition each time that events are received.
+        /// </summary>
+        ///
+        /// <value><c>true</c> if metrics are requested when events are received; otherwise, <c>false</c>.</value>
+        ///
+        /// <remarks>
+        ///   When metrics are requested, each event received from the Event Hubs service will carry metadata
+        ///   about the state of a partition that it otherwise would not.  This results in a small amount of
+        ///   additional network bandwidth consumption that is generally a favorable trade-off when considered
+        ///   against periodically making requests for partition properties using the Event Hub client.
+        /// </remarks>
+        ///
+        public bool TrackLastEnqueuedEventInformation { get; set; } = true;
+
+        /// <summary>
         ///   Determines whether the specified <see cref="System.Object" /> is equal to this instance.
         /// </summary>
         ///
@@ -161,7 +177,7 @@ namespace Azure.Messaging.EventHubs
         ///   it is not valid.
         /// </summary>
         ///
-        /// <param name="identifier">The identifier to validae.</param>
+        /// <param name="identifier">The identifier to validate.</param>
         ///
         private void ValidateIdentifier(string identifier)
         {
@@ -176,7 +192,7 @@ namespace Azure.Messaging.EventHubs
         ///   it is not valid.
         /// </summary>
         ///
-        /// <param name="maximumWaitTime">The time period to validae.</param>
+        /// <param name="maximumWaitTime">The time period to validate.</param>
         ///
         private void ValidateMaximumReceiveWaitTime(TimeSpan? maximumWaitTime)
         {
