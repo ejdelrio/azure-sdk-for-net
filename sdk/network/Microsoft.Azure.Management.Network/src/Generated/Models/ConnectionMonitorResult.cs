@@ -51,7 +51,7 @@ namespace Microsoft.Azure.Management.Network.Models
         /// <param name="monitoringIntervalInSeconds">Monitoring interval in
         /// seconds.</param>
         /// <param name="provisioningState">The provisioning state of the
-        /// connection monitor. Possible values include: 'Succeeded',
+        /// connection monitor resource. Possible values include: 'Succeeded',
         /// 'Updating', 'Deleting', 'Failed'</param>
         /// <param name="startTime">The date and time when the connection
         /// monitor was started.</param>
@@ -143,9 +143,9 @@ namespace Microsoft.Azure.Management.Network.Models
         public int? MonitoringIntervalInSeconds { get; set; }
 
         /// <summary>
-        /// Gets or sets the provisioning state of the connection monitor.
-        /// Possible values include: 'Succeeded', 'Updating', 'Deleting',
-        /// 'Failed'
+        /// Gets or sets the provisioning state of the connection monitor
+        /// resource. Possible values include: 'Succeeded', 'Updating',
+        /// 'Deleting', 'Failed'
         /// </summary>
         [JsonProperty(PropertyName = "properties.provisioningState")]
         public string ProvisioningState { get; set; }
