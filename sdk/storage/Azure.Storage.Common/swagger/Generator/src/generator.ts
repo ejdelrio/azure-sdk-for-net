@@ -120,6 +120,7 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
     const methodName = naming.method(operation.name, true);
     const regionName = (operation.group ? naming.type(operation.group) + '.' : '') + methodName;
     const pipelineName = "pipeline";
+    const bufferResponseName = "bufferResponse";
     const cancellationName = "cancellationToken";
     const bodyName = "_body";
     const requestName = "_request";
@@ -156,6 +157,7 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
     if (sync) {
         w.line(`/// <param name="async">Whether to invoke the operation asynchronously.  The default value is true.</param>`);
     }
+    w.line(`/// <param name="${bufferResponseName}">Whether to buffer the response content.  The default value is true.</param>`);
     w.line(`/// <param name="${operationName}">Operation name.</param>`);
     w.line(`/// <param name="${cancellationName}">Cancellation token.</param>`);
     w.line(`/// <returns>${operation.response.model.description || returnType.replace(/</g, '{').replace(/>/g, '}')}</returns>`);
@@ -172,8 +174,9 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
             w.write(`bool async = true`);
         }
         if (separateParams()) {  w.line(`,`); }
+        w.line(`bool ${bufferResponseName} = true,`);
         w.write(`string ${operationName} = "${naming.namespace(serviceModel.info.namespace)}.${operation.group ? operation.group + "Client" : naming.type(service.name)}.${operation.name}"`);
-        if (separateParams()) {  w.line(`,`); }
+        w.line(`,`);
         w.write(`System.Threading.CancellationToken ${cancellationName} = default`);
         w.write(')')
     });
@@ -199,7 +202,7 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
             });
             w.scope('{', '}', () => {
                 w.write(`Azure.Response ${responseName} = `);
-                const asyncCall = `await ${pipelineName}.SendRequestAsync(${requestName}, ${cancellationName}).ConfigureAwait(false)`;
+                const asyncCall = `await ${pipelineName}.SendRequestAsync(${requestName}, ${bufferResponseName}, ${cancellationName}).ConfigureAwait(false)`;
                 if (sync) {
                     w.write('async ?');
                     w.scope(() => {
@@ -207,7 +210,7 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
                         w.line(`${asyncCall} :`);
                         w.line(`// Send the request synchronously through the API that blocks if we're being called via a sync path`);
                         w.line(`// (this is safe because the Task will complete before the user can call Wait)`);
-                        w.line(`${pipelineName}.SendRequest(${requestName}, ${cancellationName});`);
+                        w.line(`${pipelineName}.SendRequest(${requestName}, ${bufferResponseName}, ${cancellationName});`);
                     });
                 } else {
                     w.line(`${asyncCall};`);
@@ -352,7 +355,13 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
         if (operation.request.body) {
             w.line(`// Create the body`);
             const bodyType = operation.request.body.model;
-            if (operation.consumes === `stream` || bodyType.type === `file`) {
+            if (bodyType.type === `string`) {
+                // Temporary Hack: Serialize string content as JSON
+                w.line(`string ${textName} = ${naming.parameter(operation.request.body.clientName)};`)
+                w.line(`${requestName}.Headers.SetValue("Content-Type", "application/json");`);
+                w.line(`${requestName}.Headers.SetValue("Content-Length", ${textName}.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));`);
+                w.line(`${requestName}.Content = Azure.Core.Pipeline.HttpPipelineRequestContent.Create(System.Text.Encoding.UTF8.GetBytes(${textName}));`);
+            } else if (operation.consumes === `stream` || bodyType.type === `file`) {
                 // Serialize a file
                 w.line(`${requestName}.Content = Azure.Core.Pipeline.HttpPipelineRequestContent.Create(${naming.parameter(operation.request.body.clientName)});`);
             } else if (operation.consumes === `xml`) {
@@ -475,7 +484,14 @@ function generateOperation(w: IndentWriter, serviceModel: IServiceModel, group: 
         w.line(`// Create the result`);
         if (response.body) {
             const responseType = response.body;
-            if (operation.produces === `stream` || responseType.type === `file`) {
+            if (responseType.type === `string`) {
+                const streamName = "_streamReader";
+                w.line(`${types.getName(model)} ${valueName};`);
+                w.line(`using (System.IO.StreamReader ${streamName} = new System.IO.StreamReader(${responseName}.ContentStream))`)
+                w.scope('{', '}', () => {
+                    w.line(`${valueName} = ${streamName}.ReadToEnd();`);
+                });
+            } else if (operation.produces === `stream` || responseType.type === `file`) {
                 // Deserialize a file
                 w.line(`${types.getName(model)} ${valueName} = new ${types.getName(model)}();`);
                 w.line(`${valueName}.${naming.property(response.bodyClientName)} = ${responseName}.ContentStream; // You should manually wrap with RetriableStream!`);

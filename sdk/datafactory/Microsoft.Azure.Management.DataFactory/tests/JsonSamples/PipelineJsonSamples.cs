@@ -3552,7 +3552,15 @@ namespace DataFactory.Tests.JsonSamples
             ""userScopeFilterUri"": ""https://graph.microsoft.com/v1.0/users?$filter=Department eq 'Finance'"",
             ""dateFilterColumn"": ""CreatedDateTime"",
             ""startTime"": ""2019-04-28T16:00:00.000Z"",
-            ""endTime"": ""2019-05-05T16:00:00.000Z""
+            ""endTime"": ""2019-05-05T16:00:00.000Z"",
+            ""outputColumns"": [
+              {
+                ""name"": ""Id""
+              },
+              {
+                ""name"": ""CreatedDateTime""
+              }
+            ]
           },
           ""sink"": {
             ""type"": ""AzureDataLakeStoreSink"",
@@ -3734,6 +3742,47 @@ namespace DataFactory.Tests.JsonSamples
   }
 }";
 
+        [JsonSample]
+        public const string CopyActivity_Orc_Adls = @"{
+  ""properties"": {
+    ""activities"": [
+      {
+        ""type"": ""Copy"",
+        ""typeProperties"": {
+          ""source"": {
+            ""type"": ""OrcSource"",
+            ""storeSettings"": {
+              ""type"": ""AzureDataLakeStoreReadSettings"",
+              ""recursive"": true,
+              ""enablePartitionDiscovery"": true
+            }
+          },
+          ""sink"": {
+            ""type"": ""OrcSink"",
+            ""storeSettings"": {
+              ""type"": ""AzureDataLakeStoreWriteSettings"",
+              ""maxConcurrentConnections"": 3,
+              ""copyBehavior"": ""PreserveHierarchy""
+            }
+          }
+        },
+        ""inputs"": [
+          {
+            ""referenceName"": ""exampleDataset"",
+            ""type"": ""DatasetReference""
+          }
+        ],
+        ""outputs"": [
+          {
+            ""referenceName"": ""exampleDataset"",
+            ""type"": ""DatasetReference""
+          }
+        ],
+        ""name"": ""ExampleCopyActivity""
+      }
+    ]
+  }
+}";
 
         [JsonSample]
         public const string CopyActivity_DelimitedText_Adls = @"{
